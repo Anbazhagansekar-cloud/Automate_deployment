@@ -1,0 +1,45 @@
+trigger:
+- main  # Automatically triggers on commits to the main branch
+
+pr:
+  branches:
+    include:
+    - feature/*  # Trigger for Pull Requests targeting the main branch
+
+variables:
+  SQL_FILE_PATH: 'sql/deployment.sql'
+  DB_SERVER: 'your-sql-server-name.database.windows.net'
+  DB_NAME: 'your-database-name'
+  DB_USERNAME: $(DB_USERNAME)  # Stored securely in Azure DevOps Pipeline variables
+  DB_PASSWORD: $(DB_PASSWORD)  # Stored securely in Azure DevOps Pipeline variables
+
+stages:
+- stage: BuildAndTest
+  displayName: "Build and Test"
+  jobs:
+  - job: Build
+    displayName: "Fetch SQL and Validate"
+    steps:
+    - checkout: self
+
+    - script: |
+        echo "Validating SQL file exists..."
+        if [ ! -f "$(SQL_FILE_PATH)" ]; then
+          echo "SQL file not found: $(SQL_FILE_PATH)"
+          exit 1
+        fi
+        echo "SQL file found: $(SQL_FILE_PATH)"
+      displayName: "Validate SQL File"
+
+- stage: Deploy
+  displayName: "Deploy to Database"
+  jobs:
+  - job: Deploy
+    displayName: "Execute SQL on Azure SQL Database"
+    steps:
+    - script: |
+        sqlcmd -S $(DB_SERVER) -d $(DB_NAME) -U $(DB_USERNAME) -P $(DB_PASSWORD) -i $(SQL_FILE_PATH)
+      displayName: "Run SQL Deployment"
+      env:
+        DB_USERNAME: $(DB_USERNAME)
+        DB_PASSWORD: $(DB_PASSWORD)
